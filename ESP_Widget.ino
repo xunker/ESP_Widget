@@ -50,12 +50,12 @@ void getData() {
   clear_display();
   sendStrXY("GETTING DATA...", 3, 0);
   delay(500);
-  
+
   const char* host = "dbepubs-mnielsen-development.s3.amazonaws.com";
-  
+
   Serial.print("connecting to ");
   Serial.println(host);
-  
+
   // Use WiFiClient class to create TCP connections
   WiFiClient client;
   const int httpPort = 80;
@@ -73,13 +73,13 @@ void getData() {
 
   String url = "/";
   url += "test_1.txt";
-  
+
   Serial.print("Requesting URL: ");
   Serial.println(url);
 
   // This will send the request to the server
   client.print(String("GET ") + url + " HTTP/1.1\r\n" +
-               "Host: " + host + "\r\n" + 
+               "Host: " + host + "\r\n" +
                "Connection: close\r\n\r\n");
   delay(10);
 
@@ -87,21 +87,21 @@ void getData() {
   sendStrXY("   CONNECTED.  ", 1, 0);
   sendStrXY(" LOADING DATA. ", 5, 0);
   delay(500);
-  
-  boolean dataMarkerFound = false;
-  
+
+  boolean textMarkerFound = false;
+
   while(client.available()){
     String line = client.readStringUntil('\n');
     Serial.print("CLIENT: "); Serial.println(line);
     Serial.println("Checking for data marker.");
-    if (line.indexOf("DATA:") > -1) {
+    if (line.indexOf("TEXT:") > -1) {
       Serial.print("Heap: "); Serial.println(system_get_free_heap_size());
       Serial.println("Data line found.");
-      dataMarkerFound = true;
+      textMarkerFound = true;
       clear_display();
     }
 
-    if (dataMarkerFound) {
+    if (textMarkerFound) {
       uint8 lineNumber = 0;
       while(client.available()){
         Serial.println("Reading data.");
@@ -113,9 +113,9 @@ void getData() {
         sendStrXY(lineBuffer, lineNumber, 0);
         lineNumber++;
       }
-        
+
       if (lineNumber == 0) {
-        Serial.println("Response contained no data.");  
+        Serial.println("Response contained no data.");
         sendStrXY("    RESPONSE   ", 1, 0);
         sendStrXY("  CONTAINED NO ", 3, 0);
         sendStrXY("      DATA.    ", 5, 0);
@@ -126,25 +126,25 @@ void getData() {
 
   }
   client.flush();
-  
+
   Serial.println();
   Serial.println("closing connection");
   client.stop();
 
-  if (dataMarkerFound) {
+  if (textMarkerFound) {
     uint8 sleepTimer = 60;
     Serial.println("Sleeping for 60 seconds.");
     while (sleepTimer > 0) {
       if ((sleepTimer % 10) == 0) {
         Serial.println(sleepTimer);
       } else {
-        Serial.print(".");  
+        Serial.print(".");
       }
       delay(1000);
       sleepTimer--;
     }
     Serial.println("Done sleeping.");
-  } 
+  }
 }
 
 void connectToNetwork() {
@@ -218,7 +218,7 @@ void enableScroll(byte direction, byte startPage, byte endPage, byte scrollSpeed
   sendcommand(0X00); //dummy
   sendcommand(0XFF);
   sendcommand(0x2F); // enable scroll
-  
+
 }
 
 void disableScroll(){
