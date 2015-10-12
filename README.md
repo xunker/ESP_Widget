@@ -68,6 +68,6 @@ BITMAP:
 * USB Power connector.
   - I recommend a [breakout board like this](https://www.adafruit.com/products/1764)).
 * 3.3V regulator.
-  Remember that the WiFi Radio uses a lot of power, so I recommend an the [LD1117](https://www.adafruit.com/products/2165) or similar. If you want more efficiency you can also use a switching regulator like the [TSR12433[(https://www.adafruit.com/products/1066), but they are **very** expensive. The [L4931](https://www.adafruit.com/products/2166) may tempt you because of its small size, but it does not have the current capacity to run the Wifi Radio.
+  Remember that the WiFi Radio uses a lot of power, so I recommend an the [LD1117](https://www.adafruit.com/products/2165) or similar. If you want more efficiency you can also use a switching regulator like the [TSR12433](https://www.adafruit.com/products/1066), but they are **very** expensive. The [L4931](https://www.adafruit.com/products/2166) may tempt you because of its small size, but it does not have the current capacity to run the Wifi Radio.
 
 For burning the code you can also use an [ESP-01 breakout board](https://www.tindie.com/products/FemtoCow/esp8266-ftdi-and-breadboard-adapter-with-33v-reg/), but that won't fit inside the 3D-printed case.
