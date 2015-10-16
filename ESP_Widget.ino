@@ -1,5 +1,6 @@
 #include "ESP8266WiFi.h"
 #include <Wire.h>
+#include <EEPROM.h>
 
 char buffer[20];
 char* password = "";
@@ -7,6 +8,8 @@ char* ssid     = "dm2p";
 String MyNetworkSSID = "dm2p"; // SSID you want to connect to Same as SSID
 bool Fl_MyNetwork = false; // Used to flag specific network has been found
 bool Fl_NetworkUP = false; // Used to flag network connected and operational.
+
+boolean configMode = false;
 
 extern "C" {
 #include "user_interface.h"
@@ -21,6 +24,9 @@ void setup() {
   Serial.print("Boot Vers: "); Serial.println(system_get_boot_version());
   Serial.print("CPU: "); Serial.println(system_get_cpu_freq());
   Serial.println();
+  Serial.println("EEPROM begin.");
+  EEPROM.begin(128); // max is 4096?
+  Serial.println();
   Serial.println("OLED network Acquire Application Started....");
   //Wire.pins(int sda, int scl), etc
   Wire.pins(0, 2); //on ESP-01.
@@ -31,19 +37,35 @@ void setup() {
   sendStrXY(" DANBICKS WIFI ", 0, 1); // 16 Character max per line with font set
   sendStrXY("   SCANNER     ", 2, 1);
   sendStrXY("  STARTING UP  ", 4, 1);
-  delay(1000);
+
+  Serial.println("Press any key in 5 seconds to enter configuration mode.");
+
+  int counter = 5;
+  while (counter > 0) {
+    delay(1000);
+    Serial.println(counter);
+    if (Serial.available()) {
+      configMode = true;
+      counter = 0;
+    } else {
+      counter--;
+    }
+  }
+
   Serial.println("Setup done");
 }
 
-
-void loop()
-{
-  if (!Fl_NetworkUP) {
-    connectToNetwork();
+void loop() {
+  if (configMode) {
+    enterConfigMode();
   } else {
-    getData();
+    if (!Fl_NetworkUP) {
+      connectToNetwork();
+    } else {
+      getData();
+    }
+    delay(5000);    // Wait a little before trying again
   }
-  delay(5000);    // Wait a little before trying again
 }
 
 void getData() {
@@ -226,4 +248,83 @@ void disableScroll(){
   sendcommand(0X00); //dummy
   sendcommand(0XFF);
   sendcommand(0x2E); // disable scroll
+}
+
+void enterConfigMode(){
+  sendStringSerialXY("Config Mode", 7, 0);
+
+  String inputString;
+  String screenBuffer[7];
+
+  Serial.print("cmd> ");
+  while (configMode) {
+    while (Serial.available()) {
+      char inChar = (char)Serial.read();
+      if (inChar == '\n') {
+        clear_display();
+
+        for(int i=0;i<6;i++) {
+          // 7 is one less than number of lines on screen
+          screenBuffer[i] = screenBuffer[i+1];
+          sendStringXY(screenBuffer[i], i, 0);
+        }
+
+        screenBuffer[6] = processConfigCommand(inputString);
+        sendStringSerialXY(screenBuffer[6], 6, 0);
+        inputString = "";
+        Serial.print("cmd> ");
+      } else if (inChar == '\r') {
+        // ignore!
+      } else {
+        inputString += inChar;
+        sendStringXY(inputString, 7, 0);
+      }
+    }
+  }
+}
+
+String processConfigCommand(String commandString) {
+  String command = commandString.substring(0, commandString.indexOf(" "));
+  if (command == "exit") {
+    return "Reboot instead.";
+  } else if (command == "ssid") {
+    if (commandString.indexOf(" ") > -1) {
+      String new_ssid = commandString.substring(commandString.indexOf(" "));
+      return "TODO make work.";
+    } else {
+      return "\"" + String(ssid) + "\"";
+    }
+  } else if (command == "password") {
+    if (commandString.indexOf(" ") > -1) {
+      String new_password = commandString.substring(commandString.indexOf(" "));
+      return "TODO make work.";
+    } else {
+      return "\"" + String(password) + "\"";
+    }
+  } else if (command == "heap") {
+    return "Heap: " + String(system_get_free_heap_size());
+  } else if (command == "boot") {
+    return "Boot Version: " + String(system_get_boot_version());
+  } else if (command == "cpu") {
+    return "CPU Freq: " + String(system_get_cpu_freq()) + "MHz";
+  } else if (command == "eeprom") {
+    String eeprom_content;
+    for( int i = 0; i < 16; i++ ) {
+      eeprom_content += (char)EEPROM.read(i);
+    }
+    return eeprom_content;
+  } else {
+    return "\"" + command + "\" unknown.";
+  }
+}
+
+void sendStringXY(String line, int X, int Y) {
+  char lineBuffer[17];
+  line.toCharArray(lineBuffer, 17);
+  sendStrXY(lineBuffer, X, Y);
+}
+
+void sendStringSerialXY(String line, int X, int Y) {
+  Serial.println(line);
+  sendStringXY(line, X, Y);
 }
