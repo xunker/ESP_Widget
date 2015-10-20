@@ -51,10 +51,6 @@ void setup() {
   sendStrXY("   SCANNER     ", 2, 1);
   sendStrXY("  STARTING UP  ", 4, 1);
 
-  loadWidgetName();
-  loadSsid();
-  loadPassword();
-
   Serial.println("Press any key in 5 seconds to enter configuration mode.");
 
   int counter = 5;
@@ -69,6 +65,11 @@ void setup() {
     }
   }
 
+  if (!configMode) {
+    loadWidgetName();
+    loadSsid();
+    loadPassword();
+  }
 
   Serial.println("Setup done");
 }
@@ -324,6 +325,8 @@ String processConfigCommand(String commandString) {
       EEPROM.end();
       Serial.println("Done.");
       strcpy(widget_name, widgetNameStruct.value);
+    } else {
+      loadWidgetName();
     }
     return "\"" + String(widget_name) + "\"";
   } else if (command == "ssid") {
@@ -345,6 +348,8 @@ String processConfigCommand(String commandString) {
       EEPROM.end();
       Serial.println("Done.");
       strcpy(ssid, ssidStruct.value);
+    } else {
+      loadSsid();
     }
     return "\"" + String(ssid) + "\"";
   } else if (command == "password") {
@@ -366,6 +371,8 @@ String processConfigCommand(String commandString) {
       EEPROM.end();
       Serial.println("Done.");
       strcpy(password, passwordStruct.value);
+    } else {
+      loadPassword();
     }
     return "\"" + String(password) + "\"";
   } else if (command == "heap") {
@@ -374,18 +381,16 @@ String processConfigCommand(String commandString) {
     return "Boot Version: " + String(system_get_boot_version());
   } else if (command == "cpu") {
     return "CPU Freq: " + String(system_get_cpu_freq()) + "MHz";
-  } else if (command == "eeprom") {
-    String eeprom_content;
-    if (commandString.indexOf(" ") > -1) {
-      int addr = commandString.substring(commandString.indexOf(" ")).toInt();
-      Serial.println(addr);
-      eeprom_content += (char)EEPROM.read(addr);
-    } else {
-      for( int i = 0; i < 16; i++ ) {
-        eeprom_content += (char)EEPROM.read(i);
-      }
+  } else if (command == "reset!") {
+    EEPROM.begin(EEPROM_SIZE);
+    Serial.print("Resetting EEPROM");
+    for( int i = 0; i <= EEPROM_SIZE; i++ ) {
+      Serial.print(".");
+      EEPROM.write(i, false);
     }
-    return eeprom_content;
+    EEPROM.end();
+    Serial.println("Done.");
+    return "EEPROM reset.";
   } else {
     return "\"" + command + "\" unknown.";
   }
