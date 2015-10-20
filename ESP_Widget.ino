@@ -6,8 +6,8 @@
 struct eepromCharArray
 {
   boolean isSet;
-  char value[32];
-} widgetNameStruct, widgetIdStruct, ssidStruct, passwordStruct;
+  char value[64];
+} widgetNameStruct, widgetIdStruct, ssidStruct, passwordStruct, hostnameStruct, pathStruct;
 
 char buffer[20];
 char* password = "some-password";
@@ -16,13 +16,18 @@ String MyNetworkSSID = "some-network-ssid"; // SSID you want to connect to Same 
 bool Fl_MyNetwork = false; // Used to flag specific network has been found
 bool Fl_NetworkUP = false; // Used to flag network connected and operational.
 
+char* host_name = "some.host";
+char* path = "/some/path.txt";
+
 char widget_name[16] = "New Widget"; // default name of widget
 
-#define EEPROM_SIZE 256 // Max is 4096.
+#define EEPROM_SIZE 768 // Max is 4096.
 #define EEPROM_WIDGET_NAME_POSITION 0
-#define EEPROM_WIDGET_ID_POSITION 64
-#define EEPROM_SSID_POSITION 128
-#define EEPROM_PASSWORD_POSITION 192
+#define EEPROM_WIDGET_ID_POSITION 128
+#define EEPROM_SSID_POSITION 256
+#define EEPROM_PASSWORD_POSITION 384
+#define EEPROM_HOST_POSITION 512
+#define EEPROM_PATH_POSITION 640
 
 boolean configMode = false;
 
@@ -69,6 +74,8 @@ void setup() {
     loadWidgetName();
     loadSsid();
     loadPassword();
+    loadHostName();
+    loadPath();
   }
 
   Serial.println("Setup done");
@@ -92,15 +99,15 @@ void getData() {
   sendStrXY("GETTING DATA...", 3, 0);
   delay(500);
 
-  const char* host = "dbepubs-mnielsen-development.s3.amazonaws.com";
+  // const char* host = "dbepubs-mnielsen-development.s3.amazonaws.com";
 
   Serial.print("connecting to ");
-  Serial.println(host);
+  Serial.println(host_name);
 
   // Use WiFiClient class to create TCP connections
   WiFiClient client;
   const int httpPort = 80;
-  if (!client.connect(host, httpPort)) {
+  if (!client.connect(host_name, httpPort)) {
     Serial.println("connection failed");
     clear_display();
     sendStrXY("  CONNECTION   ", 1, 0);
@@ -112,15 +119,15 @@ void getData() {
     return;
   }
 
-  String url = "/";
-  url += "test_1.txt";
+  // String url = "/";
+  // url += "test_1.txt";
 
   Serial.print("Requesting URL: ");
-  Serial.println(url);
+  Serial.println(path);
 
   // This will send the request to the server
-  client.print(String("GET ") + url + " HTTP/1.1\r\n" +
-               "Host: " + host + "\r\n" +
+  client.print(String("GET ") + path + " HTTP/1.1\r\n" +
+               "Host: " + host_name + "\r\n" +
                "Connection: close\r\n\r\n");
   delay(10);
 
@@ -311,8 +318,8 @@ String processConfigCommand(String commandString) {
       String new_name = commandString.substring(commandString.indexOf(" ")+1);
       Serial.println("New name: \"" + String(new_name) + "\"");
 
-      char new_name_chars[32];
-      new_name.toCharArray(new_name_chars, 31);
+      char new_name_chars[64];
+      new_name.toCharArray(new_name_chars, 63);
 
       Serial.println("New name chars:");
       Serial.println(String(new_name_chars));
@@ -334,8 +341,8 @@ String processConfigCommand(String commandString) {
       String new_ssid = commandString.substring(commandString.indexOf(" ")+1);
       Serial.println("New ssid: \"" + String(new_ssid) + "\"");
 
-      char new_ssid_chars[32];
-      new_ssid.toCharArray(new_ssid_chars, 31);
+      char new_ssid_chars[64];
+      new_ssid.toCharArray(new_ssid_chars, 63);
 
       Serial.println("New ssid chars:");
       Serial.println(String(new_ssid_chars));
@@ -357,8 +364,8 @@ String processConfigCommand(String commandString) {
       String new_password = commandString.substring(commandString.indexOf(" ")+1);
       Serial.println("New password: \"" + String(new_password) + "\"");
 
-      char new_password_chars[32];
-      new_password.toCharArray(new_password_chars, 31);
+      char new_password_chars[64];
+      new_password.toCharArray(new_password_chars, 63);
 
       Serial.println("New password chars:");
       Serial.println(String(new_password_chars));
@@ -375,6 +382,52 @@ String processConfigCommand(String commandString) {
       loadPassword();
     }
     return "\"" + String(password) + "\"";
+  } else if (command == "hostname") {
+    if (commandString.indexOf(" ") > -1) {
+      String new_host_name = commandString.substring(commandString.indexOf(" ")+1);
+      Serial.println("New hostname: \"" + String(new_host_name) + "\"");
+
+      char new_host_name_chars[64];
+      new_host_name.toCharArray(new_host_name_chars, 63);
+
+      Serial.println("New hostname chars:");
+      Serial.println(String(new_host_name_chars));
+      strcpy( hostnameStruct.value, new_host_name_chars );
+      hostnameStruct.isSet = true;
+      Serial.println(hostnameStruct.value);
+      Serial.print("Writing to  EEPROM... ");
+      EEPROM.begin(EEPROM_SIZE);
+      EEPROM_writeAnything( EEPROM_HOST_POSITION, hostnameStruct );
+      EEPROM.end();
+      Serial.println("Done.");
+      strcpy(host_name, hostnameStruct.value);
+    } else {
+      loadHostName();
+    }
+    return "\"" + String(host_name) + "\"";
+  } else if (command == "path") {
+    if (commandString.indexOf(" ") > -1) {
+      String new_path = commandString.substring(commandString.indexOf(" ")+1);
+      Serial.println("New path: \"" + String(new_path) + "\"");
+
+      char new_path_chars[64];
+      new_path.toCharArray(new_path_chars, 63);
+
+      Serial.println("New path chars:");
+      Serial.println(String(new_path_chars));
+      strcpy( pathStruct.value, new_path_chars );
+      pathStruct.isSet = true;
+      Serial.println(pathStruct.value);
+      Serial.print("Writing to  EEPROM... ");
+      EEPROM.begin(EEPROM_SIZE);
+      EEPROM_writeAnything( EEPROM_PATH_POSITION, pathStruct );
+      EEPROM.end();
+      Serial.println("Done.");
+      strcpy(path, pathStruct.value);
+    } else {
+      loadPath();
+    }
+    return "\"" + String(path) + "\"";
   } else if (command == "heap") {
     return "Heap: " + String(system_get_free_heap_size());
   } else if (command == "boot") {
@@ -449,6 +502,36 @@ void loadPassword() {
     strcpy(password, passwordStruct.value);
   } else {
     Serial.println("password not set. Using default.");
+  }
+  EEPROM.end();
+}
+
+void loadHostName() {
+  Serial.println("Loading host from EEPROM.");
+  EEPROM.begin(EEPROM_SIZE);
+  EEPROM_readAnything( EEPROM_HOST_POSITION, hostnameStruct );
+  Serial.print("hostnameStruct.isSet: "); Serial.println(hostnameStruct.isSet);
+
+  if (hostnameStruct.isSet) {
+    Serial.println("Setting host to: \"" + String(hostnameStruct.value) + "\".");
+    strcpy(host_name, hostnameStruct.value);
+  } else {
+    Serial.println("host not set. Using default.");
+  }
+  EEPROM.end();
+}
+
+void loadPath() {
+  Serial.println("Loading path from EEPROM.");
+  EEPROM.begin(EEPROM_SIZE);
+  EEPROM_readAnything( EEPROM_PATH_POSITION, pathStruct );
+  Serial.print("pathStruct.isSet: "); Serial.println(pathStruct.isSet);
+
+  if (pathStruct.isSet) {
+    Serial.println("Setting path to: \"" + String(pathStruct.value) + "\".");
+    strcpy(path, pathStruct.value);
+  } else {
+    Serial.println("path not set. Using default.");
   }
   EEPROM.end();
 }
