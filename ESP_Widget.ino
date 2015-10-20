@@ -1,20 +1,34 @@
 #include "ESP8266WiFi.h"
 #include <Wire.h>
 #include <EEPROM.h>
+#include "EEPROMAnything.h"
+
+struct eepromCharArray
+{
+  boolean isSet;
+  char value[32];
+} widgetNameStruct, widgetIdStruct, ssidStruct, passwordStruct;
 
 char buffer[20];
-char* password = "";
-char* ssid     = "dm2p";
-String MyNetworkSSID = "dm2p"; // SSID you want to connect to Same as SSID
+char* password = "some-password";
+char* ssid     = "some-network-ssid";
+String MyNetworkSSID = "some-network-ssid"; // SSID you want to connect to Same as SSID
 bool Fl_MyNetwork = false; // Used to flag specific network has been found
 bool Fl_NetworkUP = false; // Used to flag network connected and operational.
+
+char widget_name[16] = "New Widget"; // default name of widget
+
+#define EEPROM_SIZE 256 // Max is 4096.
+#define EEPROM_WIDGET_NAME_POSITION 0
+#define EEPROM_WIDGET_ID_POSITION 64
+#define EEPROM_SSID_POSITION 128
+#define EEPROM_PASSWORD_POSITION 192
 
 boolean configMode = false;
 
 extern "C" {
 #include "user_interface.h"
 }
-
 
 void setup() {
   Serial.begin(115200);
@@ -25,7 +39,6 @@ void setup() {
   Serial.print("CPU: "); Serial.println(system_get_cpu_freq());
   Serial.println();
   Serial.println("EEPROM begin.");
-  EEPROM.begin(128); // max is 4096?
   Serial.println();
   Serial.println("OLED network Acquire Application Started....");
   //Wire.pins(int sda, int scl), etc
@@ -37,6 +50,10 @@ void setup() {
   sendStrXY(" DANBICKS WIFI ", 0, 1); // 16 Character max per line with font set
   sendStrXY("   SCANNER     ", 2, 1);
   sendStrXY("  STARTING UP  ", 4, 1);
+
+  loadWidgetName();
+  loadSsid();
+  loadPassword();
 
   Serial.println("Press any key in 5 seconds to enter configuration mode.");
 
@@ -51,6 +68,7 @@ void setup() {
       counter--;
     }
   }
+
 
   Serial.println("Setup done");
 }
@@ -287,20 +305,69 @@ String processConfigCommand(String commandString) {
   String command = commandString.substring(0, commandString.indexOf(" "));
   if (command == "exit") {
     return "Reboot instead.";
+  } else if (command == "name") {
+    if (commandString.indexOf(" ") > -1) {
+      String new_name = commandString.substring(commandString.indexOf(" ")+1);
+      Serial.println("New name: \"" + String(new_name) + "\"");
+
+      char new_name_chars[32];
+      new_name.toCharArray(new_name_chars, 31);
+
+      Serial.println("New name chars:");
+      Serial.println(String(new_name_chars));
+      strcpy( widgetNameStruct.value, new_name_chars );
+      widgetNameStruct.isSet = true;
+      Serial.println(widgetNameStruct.value);
+      Serial.print("Writing to  EEPROM... ");
+      EEPROM.begin(EEPROM_SIZE);
+      EEPROM_writeAnything( EEPROM_WIDGET_NAME_POSITION, widgetNameStruct );
+      EEPROM.end();
+      Serial.println("Done.");
+      strcpy(widget_name, widgetNameStruct.value);
+    }
+    return "\"" + String(widget_name) + "\"";
   } else if (command == "ssid") {
     if (commandString.indexOf(" ") > -1) {
-      String new_ssid = commandString.substring(commandString.indexOf(" "));
-      return "TODO make work.";
-    } else {
-      return "\"" + String(ssid) + "\"";
+      String new_ssid = commandString.substring(commandString.indexOf(" ")+1);
+      Serial.println("New ssid: \"" + String(new_ssid) + "\"");
+
+      char new_ssid_chars[32];
+      new_ssid.toCharArray(new_ssid_chars, 31);
+
+      Serial.println("New ssid chars:");
+      Serial.println(String(new_ssid_chars));
+      strcpy( ssidStruct.value, new_ssid_chars );
+      ssidStruct.isSet = true;
+      Serial.println(ssidStruct.value);
+      Serial.print("Writing to  EEPROM... ");
+      EEPROM.begin(EEPROM_SIZE);
+      EEPROM_writeAnything( EEPROM_SSID_POSITION, ssidStruct );
+      EEPROM.end();
+      Serial.println("Done.");
+      strcpy(ssid, ssidStruct.value);
     }
+    return "\"" + String(ssid) + "\"";
   } else if (command == "password") {
     if (commandString.indexOf(" ") > -1) {
-      String new_password = commandString.substring(commandString.indexOf(" "));
-      return "TODO make work.";
-    } else {
-      return "\"" + String(password) + "\"";
+      String new_password = commandString.substring(commandString.indexOf(" ")+1);
+      Serial.println("New password: \"" + String(new_password) + "\"");
+
+      char new_password_chars[32];
+      new_password.toCharArray(new_password_chars, 31);
+
+      Serial.println("New password chars:");
+      Serial.println(String(new_password_chars));
+      strcpy( passwordStruct.value, new_password_chars );
+      passwordStruct.isSet = true;
+      Serial.println(passwordStruct.value);
+      Serial.print("Writing to  EEPROM... ");
+      EEPROM.begin(EEPROM_SIZE);
+      EEPROM_writeAnything( EEPROM_PASSWORD_POSITION, passwordStruct );
+      EEPROM.end();
+      Serial.println("Done.");
+      strcpy(password, passwordStruct.value);
     }
+    return "\"" + String(password) + "\"";
   } else if (command == "heap") {
     return "Heap: " + String(system_get_free_heap_size());
   } else if (command == "boot") {
@@ -309,8 +376,14 @@ String processConfigCommand(String commandString) {
     return "CPU Freq: " + String(system_get_cpu_freq()) + "MHz";
   } else if (command == "eeprom") {
     String eeprom_content;
-    for( int i = 0; i < 16; i++ ) {
-      eeprom_content += (char)EEPROM.read(i);
+    if (commandString.indexOf(" ") > -1) {
+      int addr = commandString.substring(commandString.indexOf(" ")).toInt();
+      Serial.println(addr);
+      eeprom_content += (char)EEPROM.read(addr);
+    } else {
+      for( int i = 0; i < 16; i++ ) {
+        eeprom_content += (char)EEPROM.read(i);
+      }
     }
     return eeprom_content;
   } else {
@@ -327,4 +400,50 @@ void sendStringXY(String line, int X, int Y) {
 void sendStringSerialXY(String line, int X, int Y) {
   Serial.println(line);
   sendStringXY(line, X, Y);
+}
+
+void loadWidgetName() {
+  Serial.println("Loading widget name from EEPROM.");
+  EEPROM.begin(EEPROM_SIZE);
+  EEPROM_readAnything( EEPROM_WIDGET_NAME_POSITION, widgetNameStruct );
+  Serial.print("widgetNameStruct.isSet: "); Serial.println(widgetNameStruct.isSet);
+
+  if (widgetNameStruct.isSet) {
+    Serial.println("Setting Widget Name to: \"" + String(widgetNameStruct.value) + "\".");
+    strcpy(widget_name, widgetNameStruct.value);
+  } else {
+    Serial.println("Widget Name not set. Using default.");
+  }
+  EEPROM.end();
+}
+
+void loadSsid() {
+  Serial.println("Loading ssid from EEPROM.");
+  EEPROM.begin(EEPROM_SIZE);
+  EEPROM_readAnything( EEPROM_SSID_POSITION, ssidStruct );
+  Serial.print("ssidStruct.isSet: "); Serial.println(ssidStruct.isSet);
+
+  if (ssidStruct.isSet) {
+    Serial.println("Setting SSID to: \"" + String(ssidStruct.value) + "\".");
+    strcpy(ssid, ssidStruct.value);
+    MyNetworkSSID = String(ssid);
+  } else {
+    Serial.println("SSID not set. Using default.");
+  }
+  EEPROM.end();
+}
+
+void loadPassword() {
+  Serial.println("Loading password from EEPROM.");
+  EEPROM.begin(EEPROM_SIZE);
+  EEPROM_readAnything( EEPROM_PASSWORD_POSITION, passwordStruct );
+  Serial.print("passwordStruct.isSet: "); Serial.println(passwordStruct.isSet);
+
+  if (passwordStruct.isSet) {
+    Serial.println("Setting password to: \"" + String(passwordStruct.value) + "\".");
+    strcpy(password, passwordStruct.value);
+  } else {
+    Serial.println("password not set. Using default.");
+  }
+  EEPROM.end();
 }
